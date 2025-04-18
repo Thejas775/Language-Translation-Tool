@@ -12,6 +12,7 @@ load_dotenv()
 
 # Configure the Gemini API
 def configure_genai():
+    api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
         api_key = st.session_state.get('api_key', '')
     
