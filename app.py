@@ -17,9 +17,22 @@ from github import Auth
 # Load environment variables
 load_dotenv()
 
+# Replace the existing credential retrieval code with this updated version
+# that supports both local environment variables and Streamlit Cloud secrets
+
 # Configure the Gemini API
 def configure_genai():
-    api_key = os.getenv('GEMINI_API_KEY')
+    # First try to get the API key from Streamlit secrets
+    api_key = None
+    
+    # Try getting from Streamlit secrets
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except:
+        # If not in secrets, try environment variables
+        api_key = os.getenv('GEMINI_API_KEY')
+        
+    # If still not found, check session state (from sidebar input)
     if not api_key:
         api_key = st.session_state.get('api_key', '')
     
@@ -34,7 +47,46 @@ def configure_genai():
 
 # Configure GitHub API
 def configure_github():
-    github_token = os.getenv('GITHUB_TOKEN')
+    # First try to get the token from Streamlit secrets
+    github_token = None
+    
+    # Try getting from Streamlit secrets
+    try:
+        github_token = st.secrets["GITHUB_TOKEN"]
+    except:
+        # If not in secrets, try environment variables
+        github_token = os.getenv('GITHUB_TOKEN')
+    
+    # If still not found, check session state (from sidebar input)
+    if not github_token:
+        github_token = st.session_state.get('github_token', '')
+    
+    if github_token:
+        try:
+            auth = Auth.Token(github_token)
+            g = Github(auth=auth)
+            # Test the connection
+            g.get_user().login
+            return g
+        except Exception as e:
+            st.error(f"Failed to configure GitHub API: {str(e)}")
+            return None
+    return None
+    """
+    Configure the GitHub API using Streamlit secrets
+    """
+    # First try to get the token from Streamlit secrets
+    github_token = None
+    
+    # Check if the secrets are configured in Streamlit Cloud
+    if hasattr(st, 'secrets') and 'github_token' in st.secrets:
+        github_token = st.secrets['github_token']
+    
+    # If not found in secrets, check environment variables
+    if not github_token:
+        github_token = os.getenv('GITHUB_TOKEN')
+    
+    # If still not found, check session state (from user input)
     if not github_token:
         github_token = st.session_state.get('github_token', '')
     
@@ -809,27 +861,46 @@ if 'projects' not in st.session_state:
     st.session_state.projects = {}
 
 # API Key input
+import streamlit as st
+
+# Create a small button in the sidebar to show/hide configuration
 with st.sidebar:
-    st.header("Configuration")
-    
-    # Gemini API Key
-    api_key = st.text_input("Enter Gemini API Key", type="password", key="api_key")
-    if st.button("Configure Gemini API"):
-        if configure_genai():
-            st.success("Gemini API configured successfully!")
-        else:
-            st.error("Please provide a valid Gemini API key")
-    
-    # GitHub API Token
-    github_token = st.text_input("Enter GitHub Token", type="password", key="github_token")
-    if st.button("Configure GitHub API"):
-        if github_token:
-            if configure_github():
-                st.success("GitHub API configured successfully!")
+    show_config = st.button("⚙️ Show Configuration")
+
+# Use session state to track whether configuration should be shown
+if "show_configuration" not in st.session_state:
+    st.session_state.show_configuration = False
+
+# Toggle the configuration visibility when button is clicked
+if show_config:
+    st.session_state.show_configuration = not st.session_state.show_configuration
+
+# Only display configuration when show_configuration is True
+if st.session_state.show_configuration:
+    with st.sidebar:
+        st.header("Configuration")
+        
+        # Gemini API Key
+        api_key = st.text_input("Enter Gemini API Key", type="password", key="api_key")
+        if st.button("Configure Gemini API"):
+            if api_key:
+                if configure_genai():
+                    st.success("Gemini API configured successfully!")
+                else:
+                    st.error("Please provide a valid Gemini API key")
             else:
-                st.error("Failed to configure GitHub API. Check your token.")
-        else:
-            st.error("Please provide a GitHub token")
+                st.error("Please provide a Gemini API key")
+        
+        # GitHub API Token
+        github_token = st.text_input("Enter GitHub Token", type="password", key="github_token")
+        if st.button("Configure GitHub API"):
+            if github_token:
+                if configure_github():
+                    st.success("GitHub API configured successfully!")
+                else:
+                    st.error("Failed to configure GitHub API. Check your token.")
+            else:
+                st.error("Please provide a GitHub token")
 
 # Main workflow
 tabs = st.tabs(["Dashboard", "Upload & Translate", "Review & Edit", "Export"])
