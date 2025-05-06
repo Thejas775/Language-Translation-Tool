@@ -1,35 +1,24 @@
+# setup.sh
 #!/bin/bash
 
-# Make script exit on error
-set -e
+echo "Setting up UI String Translator..."
 
-echo "Setting up UI String Translator & GitHub Integrator..."
-
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo "Docker is not installed. Please install Docker first."
-    exit 1
+# Create .env files if they don't exist
+if [ ! -f ./backend/.env ]; then
+  echo "Creating backend/.env file..."
+  echo "GEMINI_API_KEY=" > ./backend/.env
+  echo "GITHUB_TOKEN=" >> ./backend/.env
+  echo "Backend .env file created. Please edit it to add your API keys."
 fi
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo "Docker Compose is not installed. Please install Docker Compose first."
-    exit 1
+if [ ! -f ./frontend/.env ]; then
+  echo "Creating frontend/.env file..."
+  echo "REACT_APP_API_URL=http://localhost:8000" > ./frontend/.env
+  echo "Frontend .env file created."
 fi
 
-# Create .env file if it doesn't exist
-if [ ! -f .env ]; then
-    echo "Creating .env file from template..."
-    cp .env.example .env
-    echo "Please edit the .env file and add your API keys."
-else
-    echo ".env file already exists."
-fi
+# Start the application with Docker Compose
+echo "Starting application with Docker Compose..."
+docker-compose up --build
 
-# Build and start the containers
-echo "Building and starting Docker containers..."
-docker-compose up -d --build
-
-echo ""
-echo "Setup complete! The application is running at http://localhost:8501"
-echo "To stop the application, run: docker-compose down"
+echo "Setup complete!"
