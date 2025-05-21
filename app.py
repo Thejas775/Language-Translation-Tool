@@ -17,8 +17,251 @@ from github import Auth
 # Load environment variables
 load_dotenv()
 
-# Replace the existing credential retrieval code with this updated version
-# that supports both local environment variables and Streamlit Cloud secrets
+# Initialize session state variables early
+if 'page' not in st.session_state:
+    st.session_state.page = "📚 Home"
+if 'sidebar_expanded' not in st.session_state:
+    st.session_state.sidebar_expanded = False
+if 'projects' not in st.session_state:
+    st.session_state.projects = {}
+if 'original_content' not in st.session_state:
+    st.session_state.original_content = {}
+if 'flattened_content' not in st.session_state:
+    st.session_state.flattened_content = {}
+if 'contexts' not in st.session_state:
+    st.session_state.contexts = {}
+if 'translations' not in st.session_state:
+    st.session_state.translations = {}
+if 'string_files' not in st.session_state:
+    st.session_state.string_files = {}
+if 'selected_project' not in st.session_state:
+    st.session_state.selected_project = None
+if 'show_language_dialog' not in st.session_state:
+    st.session_state.show_language_dialog = False
+if 'selected_file_for_translation' not in st.session_state:
+    st.session_state.selected_file_for_translation = None
+if 'selected_file_strings' not in st.session_state:
+    st.session_state.selected_file_strings = {}
+if 'show_language_dialog_for_file' not in st.session_state:
+    st.session_state.show_language_dialog_for_file = False
+if 'review_file_path' not in st.session_state:
+    st.session_state.review_file_path = None
+if 'show_project_files' not in st.session_state:
+    st.session_state.show_project_files = False
+
+# Set page configuration
+st.set_page_config(
+    page_title="UI String Translator",
+    page_icon="🌐",
+    layout="wide",
+    initial_sidebar_state="collapsed" if not st.session_state.sidebar_expanded else "expanded"
+)
+
+# Add custom CSS for modern UI
+st.markdown("""
+<style>
+    /* Main container styling */
+    .main {
+        background-color: #f8f9fa;
+    }
+    
+    /* Card-like containers */
+    .stApp div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"] {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    
+    /* Headings */
+    h1 {
+        color: #1E3A8A;
+        font-weight: 700 !important;
+        margin-bottom: 24px !important;
+    }
+    
+    h2 {
+        color: #2563EB;
+        font-weight: 600 !important;
+        margin: 20px 0 !important;
+    }
+    
+    h3 {
+        color: #3B82F6;
+        font-weight: 500 !important;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    /* Primary button */
+    .stButton > button[data-baseweb="button"] {
+        background-color: #2563EB;
+        border: none;
+    }
+    
+    .stButton > button[data-baseweb="button"]:hover {
+        background-color: #1E40AF;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Progress bar */
+    div[data-testid="stProgressBar"] {
+        background-color: #E5E7EB;
+    }
+    
+    div[data-testid="stProgressBar"] > div {
+        background-color: #3B82F6 !important;
+    }
+    
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #1E293B;
+        color: white;
+    }
+    
+    section[data-testid="stSidebar"] button {
+        background-color: #3B82F6;
+        color: white;
+        border: none;
+    }
+    
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3, section[data-testid="stSidebar"] h4 {
+        color: white;
+    }
+    
+    /* Expanders */
+    .streamlit-expanderHeader {
+        font-weight: 500;
+        color: #4B5563;
+    }
+    
+    /* Success messages */
+    div[data-baseweb="notification"] {
+        border-radius: 6px;
+    }
+    
+    /* Dataframes */
+    div[data-testid="stDataFrame"] {
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    
+    /* File uploader */
+    .stFileUploader > div {
+        border-radius: 6px;
+    }
+    
+    /* Status text */
+    .status-info {
+        background-color: #EFF6FF;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border-left: 4px solid #3B82F6;
+        margin: 10px 0;
+    }
+    
+    .status-success {
+        background-color: #ECFDF5;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border-left: 4px solid #10B981;
+        margin: 10px 0;
+    }
+    
+    .status-warning {
+        background-color: #FFFBEB;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border-left: 4px solid #F59E0B;
+        margin: 10px 0;
+    }
+    
+    .status-error {
+        background-color: #FEF2F2;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border-left: 4px solid #EF4444;
+        margin: 10px 0;
+    }
+    
+    /* Icons */
+    .icon-text {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    /* Hero section */
+    .hero-section {
+        padding: 40px 0;
+        text-align: center;
+        background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+        color: white;
+        border-radius: 10px;
+        margin-bottom: 30px;
+    }
+    
+    .hero-section h1 {
+        color: white;
+        font-size: 3rem;
+        font-weight: 800 !important;
+        margin-bottom: 16px !important;
+    }
+    
+    .hero-section p {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        max-width: 800px;
+        margin: 0 auto 30px auto;
+    }
+    
+    /* Cards for features */
+    .feature-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        height: 100%;
+    }
+    
+    .feature-card h3 {
+        color: #1E3A8A;
+        margin-bottom: 15px;
+    }
+    
+    /* Nav section */
+    .nav-section {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin: 30px 0;
+    }
+    
+    .nav-button {
+        background-color: white;
+        color: #2563EB;
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        border: 1px solid #E5E7EB;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-button:hover {
+        background-color: #2563EB;
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Configure the Gemini API
 def configure_genai():
@@ -72,35 +315,6 @@ def configure_github():
             st.error(f"Failed to configure GitHub API: {str(e)}")
             return None
     return None
-    """
-    Configure the GitHub API using Streamlit secrets
-    """
-    # First try to get the token from Streamlit secrets
-    github_token = None
-    
-    # Check if the secrets are configured in Streamlit Cloud
-    if hasattr(st, 'secrets') and 'github_token' in st.secrets:
-        github_token = st.secrets['github_token']
-    
-    # If not found in secrets, check environment variables
-    if not github_token:
-        github_token = os.getenv('GITHUB_TOKEN')
-    
-    # If still not found, check session state (from user input)
-    if not github_token:
-        github_token = st.session_state.get('github_token', '')
-    
-    if github_token:
-        try:
-            auth = Auth.Token(github_token)
-            g = Github(auth=auth)
-            # Test the connection
-            g.get_user().login
-            return g
-        except Exception as e:
-            st.error(f"Failed to configure GitHub API: {str(e)}")
-            return None
-    return None
 
 def scan_github_repository(repo_url, pattern_search=True):
     """
@@ -140,39 +354,39 @@ def scan_github_repository(repo_url, pattern_search=True):
         
         # If branch was specified in the URL, use it
         if branch:
-            st.info(f"Scanning branch: {branch}")
+            st.markdown(f"<div class='status-info'>Scanning branch: {branch}</div>", unsafe_allow_html=True)
             # Verify the branch exists
             try:
                 repo.get_branch(branch)
             except Exception as e:
-                st.error(f"Branch '{branch}' not found. Error: {str(e)}")
+                st.markdown(f"<div class='status-error'>Branch '{branch}' not found. Error: {str(e)}</div>", unsafe_allow_html=True)
                 return {}
         else:
             # Otherwise use the default branch
             branch = repo.default_branch
-            st.info(f"Using default branch: {branch}")
+            st.markdown(f"<div class='status-info'>Using default branch: {branch}</div>", unsafe_allow_html=True)
         
         # Common patterns where strings.xml files are typically located
         common_patterns = [
             # Mifos KMP specific patterns - prioritize these
-            # "feature/*/src/commonMain/composeResources/values/strings.xml",
-            # "feature/*/src/*/composeResources/values/strings.xml",
-            # "feature/*/src/*/resources/values/strings.xml",
+            "feature/*/src/commonMain/composeResources/values/strings.xml",
+            "feature/*/src/*/composeResources/values/strings.xml",
+            "feature/*/src/*/resources/values/strings.xml",
             
             # KMM/Compose Multiplatform patterns
             "*/src/commonMain/composeResources/values/strings.xml",
             "*/*/src/commonMain/composeResources/values/strings.xml",
-            # "*/src/commonMain/resources/MR/base/strings.xml",
-            # "*/*/src/commonMain/resources/MR/base/strings.xml",
+            "*/src/commonMain/resources/MR/base/strings.xml",
+            "*/*/src/commonMain/resources/MR/base/strings.xml",
             
-            # # Android module patterns
-            # "*/src/main/res/values/strings.xml",
-            # "*/*/src/main/res/values/strings.xml",
-            # "feature/*/src/main/res/values/strings.xml",
+            # Android module patterns
+            "*/src/main/res/values/strings.xml",
+            "*/*/src/main/res/values/strings.xml",
+            "feature/*/src/main/res/values/strings.xml",
             
-            # # General fallbacks
-            # "**/values/strings.xml",
-            # "**/values-*/strings.xml"
+            # General fallbacks
+            "**/values/strings.xml",
+            "**/values-*/strings.xml"
         ]
         
         found_files = {}
@@ -212,11 +426,11 @@ def scan_github_repository(repo_url, pattern_search=True):
         
         # If no files were found with pattern search or pattern search is disabled,
         # fall back to full repository scan (slower but thorough)
-        st.info(f"Pattern search didn't find strings.xml files. Performing a full repository scan of branch '{branch}' (this may take longer)...")
+        st.markdown("<div class='status-info'>Pattern search didn't find strings.xml files. Performing a full repository scan (this may take longer)...</div>", unsafe_allow_html=True)
         return search_files_in_repo(repo, "strings.xml", branch)
             
     except Exception as e:
-        st.error(f"Error scanning repository: {str(e)}")
+        st.markdown(f"<div class='status-error'>Error scanning repository: {str(e)}</div>", unsafe_allow_html=True)
         return {}
 
 def search_by_pattern(repo, contents, pattern_parts, current_depth, branch):
@@ -332,92 +546,6 @@ def search_files_in_repo(repo, filename, branch):
                     continue
     
     return found_files
-    """
-    Search for files in a repository with a specific filename.
-    
-    Args:
-        repo: GitHub repository object
-        filename (str): The filename to search for
-        
-    Returns:
-        dict: A dictionary mapping file paths to their content
-    """
-    found_files = {}
-    
-    # Get the default branch
-    default_branch = repo.default_branch
-    
-    # Get all files in the repository
-    contents = repo.get_contents("")
-    
-    with st.spinner(f"Scanning repository for {filename} files..."):
-        progress_bar = st.progress(0)
-        total_files = len(contents)
-        processed = 0
-        
-        while contents:
-            file_content = contents.pop(0)
-            processed += 1
-            progress_bar.progress(min(1.0, processed / max(1, total_files)))
-            
-            if file_content.type == "dir":
-                try:
-                    # Add directory contents to the queue
-                    dir_contents = repo.get_contents(file_content.path)
-                    contents.extend(dir_contents)
-                    total_files += len(dir_contents) - 1  # Adjust total count
-                except Exception as e:
-                    # Skip if we can't access the directory
-                    st.caption(f"Error accessing directory {file_content.path}: {str(e)}")
-                    continue
-            elif file_content.name == filename:
-                # Found a strings.xml file
-                try:
-                    raw_content = base64.b64decode(file_content.content).decode('utf-8')
-                    found_files[file_content.path] = raw_content
-                    st.caption(f"Found file: {file_content.path}")
-                except Exception as e:
-                    # Skip if we can't decode the content
-                    st.caption(f"Error decoding content of {file_content.path}: {str(e)}")
-                    continue
-    
-    return found_files
-    """
-    Search for files in a repository with a specific filename.
-    
-    Args:
-        repo: GitHub repository object
-        filename (str): The filename to search for
-        
-    Returns:
-        dict: A dictionary mapping file paths to their content
-    """
-    found_files = {}
-    
-    # Get the default branch
-    default_branch = repo.default_branch
-    
-    # Get all files in the repository
-    contents = repo.get_contents("")
-    
-    with st.spinner(f"Scanning repository for {filename} files..."):
-        progress_bar = st.progress(0)
-        total_files = len(contents)
-        processed = 0
-        
-        while contents:
-            file_content = contents.pop(0)
-            processed += 1
-            progress_bar.progress(min(1.0, processed / max(1, total_files)))
-            
-            if file_content.type == "dir":
-                contents.extend(repo.get_contents(file_content.path))
-            elif file_content.name == filename:
-                # Found a strings.xml file
-                raw_content = base64.b64decode(file_content.content).decode('utf-8')
-                found_files[file_content.path] = raw_content
-    
-    return found_files
 
 def parse_strings_xml(xml_content):
     """
@@ -442,7 +570,7 @@ def parse_strings_xml(xml_content):
                 
         return result
     except Exception as e:
-        st.error(f"Error parsing XML: {str(e)}")
+        st.markdown(f"<div class='status-error'>Error parsing XML: {str(e)}</div>", unsafe_allow_html=True)
         return {}
 
 def parse_translation_response(response_text):
@@ -550,7 +678,7 @@ def translate_all_strings(texts_dict, target_language, contexts_dict={}):
         
 
         if estimated_tokens > 10000000:
-            st.info(f"Input is too large for a single API call (est. {int(estimated_tokens)} tokens). Switching to batch mode...")
+            st.markdown("<div class='status-info'>Input is too large for a single API call. Switching to batch mode...</div>", unsafe_allow_html=True)
             return batch_translate_texts(string_contents, target_language, contexts_dict)
         
         # Craft a translation prompt for all strings at once
@@ -593,13 +721,13 @@ def translate_all_strings(texts_dict, target_language, contexts_dict={}):
             return translations
             
         # If parsing completely fails, fall back to batch translation
-        st.warning("Failed to parse response. Switching to batch mode...")
+        st.markdown("<div class='status-warning'>Failed to parse response. Switching to batch mode...</div>", unsafe_allow_html=True)
         return batch_translate_texts(string_contents, target_language, contexts_dict)
             
     except Exception as e:
-        st.error(f"Translation error: {str(e)}")
+        st.markdown(f"<div class='status-error'>Translation error: {str(e)}</div>", unsafe_allow_html=True)
         # Fall back to batch translation
-        st.warning("Error in single API call. Switching to batch mode...")
+        st.markdown("<div class='status-warning'>Error in single API call. Switching to batch mode...</div>", unsafe_allow_html=True)
         return batch_translate_texts(string_contents, target_language, contexts_dict)
 
 def batch_translate_texts(texts_dict, target_language, contexts_dict={}):
@@ -622,7 +750,7 @@ def batch_translate_texts(texts_dict, target_language, contexts_dict={}):
             batch = texts_list[i:i+batch_size]
             current_batch = (i//batch_size) + 1
             
-            status_text.text(f"Translating batch {current_batch} of {total_batches} ({len(batch)} strings)")
+            status_text.markdown(f"<div class='status-info'>Translating batch {current_batch} of {total_batches} ({len(batch)} strings)</div>", unsafe_allow_html=True)
             
             # Create structured format for translation with JSON
             translation_items = []
@@ -679,10 +807,10 @@ def batch_translate_texts(texts_dict, target_language, contexts_dict={}):
                         all_results.update(translations)
                         break  # Success! Exit retry loop
                     elif retry < max_retries - 1:
-                        st.warning(f"Failed to parse batch {current_batch}. Retrying ({retry + 1}/{max_retries})...")
+                        st.markdown(f"<div class='status-warning'>Failed to parse batch {current_batch}. Retrying ({retry + 1}/{max_retries})...</div>", unsafe_allow_html=True)
                         time.sleep(2)  # Wait a bit before retrying
                     else:
-                        st.error(f"Failed to translate batch {current_batch} after {max_retries} attempts. Skipping batch.")
+                        st.markdown(f"<div class='status-error'>Failed to translate batch {current_batch} after {max_retries} attempts. Skipping batch.</div>", unsafe_allow_html=True)
                         # Add batch keys with original values to show something rather than nothing
                         for key, text in batch:
                             if key not in all_results:
@@ -690,10 +818,10 @@ def batch_translate_texts(texts_dict, target_language, contexts_dict={}):
                 
                 except Exception as batch_error:
                     if retry < max_retries - 1:
-                        st.warning(f"Error in batch {current_batch}: {str(batch_error)}. Retrying ({retry + 1}/{max_retries})...")
+                        st.markdown(f"<div class='status-warning'>Error in batch {current_batch}: {str(batch_error)}. Retrying ({retry + 1}/{max_retries})...</div>", unsafe_allow_html=True)
                         time.sleep(2)  # Wait a bit before retrying
                     else:
-                        st.error(f"Failed to process batch {current_batch} after {max_retries} attempts. Skipping batch.")
+                        st.markdown(f"<div class='status-error'>Failed to process batch {current_batch} after {max_retries} attempts. Skipping batch.</div>", unsafe_allow_html=True)
                         # Add batch keys with original values to show something rather than nothing
                         for key, text in batch:
                             if key not in all_results:
@@ -713,7 +841,7 @@ def batch_translate_texts(texts_dict, target_language, contexts_dict={}):
         return all_results
         
     except Exception as e:
-        st.error(f"Batch translation error: {str(e)}")
+        st.markdown(f"<div class='status-error'>Batch translation error: {str(e)}</div>", unsafe_allow_html=True)
         # Create a dictionary with original strings as fallback
         return {k: v for k, v in texts_dict.items() if isinstance(v, str)}
         
@@ -749,7 +877,7 @@ def translate_text(text, target_language, context=""):
         
         return translation
     except Exception as e:
-        st.error(f"Single translation error: {str(e)}")
+        st.markdown(f"<div class='status-error'>Single translation error: {str(e)}</div>", unsafe_allow_html=True)
         return None
 
 def flatten_json(nested_json, prefix=""):
@@ -788,7 +916,7 @@ def xml_to_strings_dict(xml_content):
                 
         return strings_dict
     except Exception as e:
-        st.error(f"Error parsing XML: {str(e)}")
+        st.markdown(f"<div class='status-error'>Error parsing XML: {str(e)}</div>", unsafe_allow_html=True)
         return {}
 
 def dict_to_strings_xml(strings_dict, language_code=None):
@@ -849,70 +977,193 @@ LANGUAGE_CODES = {
     "Vietnamese": "vi"
 }
 
-# App title and description
-st.title("UI String Translator & GitHub Integrator")
-st.markdown("""
-Create localization files for your application with context-aware translations.
-Upload JSON or XML files, or connect to GitHub to automatically scan repositories for translatable strings.
-""")
-
 # Initialize session states for projects
 if 'projects' not in st.session_state:
     st.session_state.projects = {}
 
-# API Key input
-import streamlit as st
-
-# Create a small button in the sidebar to show/hide configuration
+# Configuration sidebar
 with st.sidebar:
-    show_config = st.button("⚙️ Show Configuration")
-
-# Use session state to track whether configuration should be shown
-if "show_configuration" not in st.session_state:
-    st.session_state.show_configuration = False
-
-# Toggle the configuration visibility when button is clicked
-if show_config:
-    st.session_state.show_configuration = not st.session_state.show_configuration
-
-# Only display configuration when show_configuration is True
-if st.session_state.show_configuration:
-    with st.sidebar:
-        st.header("Configuration")
-        
+    st.image("https://upload.wikimedia.org/wikipedia/commons/7/76/Translate_icon.png", width=50)
+    st.markdown("<h2 style='color:white;'>App Configuration</h2>", unsafe_allow_html=True)
+    
+    # Only display configuration when show_configuration is True
+    with st.expander("🔑 API Configuration", expanded=False):        
         # Gemini API Key
-        api_key = st.text_input("Enter Gemini API Key", type="password", key="api_key")
+        api_key = st.text_input("Gemini API Key", type="password", key="api_key")
         if st.button("Configure Gemini API"):
             if api_key:
                 if configure_genai():
-                    st.success("Gemini API configured successfully!")
+                    st.markdown("<div class='status-success'>Gemini API configured successfully!</div>", unsafe_allow_html=True)
                 else:
-                    st.error("Please provide a valid Gemini API key")
+                    st.markdown("<div class='status-error'>Please provide a valid Gemini API key</div>", unsafe_allow_html=True)
             else:
-                st.error("Please provide a Gemini API key")
+                st.markdown("<div class='status-error'>Please provide a Gemini API key</div>", unsafe_allow_html=True)
         
         # GitHub API Token
-        github_token = st.text_input("Enter GitHub Token", type="password", key="github_token")
+        github_token = st.text_input("GitHub Token", type="password", key="github_token")
         if st.button("Configure GitHub API"):
             if github_token:
                 if configure_github():
-                    st.success("GitHub API configured successfully!")
+                    st.markdown("<div class='status-success'>GitHub API configured successfully!</div>", unsafe_allow_html=True)
                 else:
-                    st.error("Failed to configure GitHub API. Check your token.")
+                    st.markdown("<div class='status-error'>Failed to configure GitHub API. Check your token.</div>", unsafe_allow_html=True)
             else:
-                st.error("Please provide a GitHub token")
+                st.markdown("<div class='status-error'>Please provide a GitHub token</div>", unsafe_allow_html=True)
 
-# Main workflow
-tabs = st.tabs(["Dashboard", "Upload & Translate", "Review & Edit", "Export"])
+    # Navigation
+    st.markdown("<h3 style='color:white;'>Navigation</h3>", unsafe_allow_html=True)
+    
+    # Use on_change to update session state
+    def change_page():
+        st.session_state.page = st.session_state.page_selection
+    
+    page = st.radio(
+        "Select Page",
+        ["📚 Home", "📋 Projects", "🔄 Translation Review", "📤 Export"],
+        key="page_selection",
+        index=["📚 Home", "📋 Projects", "🔄 Translation Review", "📤 Export"].index(st.session_state.page),
+        on_change=change_page
+    )
 
-# Dashboard tab
+    # Quick how-to guide in the sidebar
+    with st.expander("❓ How to use", expanded=False):
+        st.markdown("""
+        1. Configure API keys in the sidebar
+        2. Create a new project
+        3. Select source files (upload or GitHub)
+        4. Choose languages to translate to
+        5. Review and edit translations
+        6. Export translations in desired format
+        """)
 
-# Dashboard tab
-with tabs[0]:
-    st.header("Translation Projects Dashboard")
+# Initialize session state for the first run
+if 'original_content' not in st.session_state:
+    st.session_state.original_content = {}
+
+if 'flattened_content' not in st.session_state:
+    st.session_state.flattened_content = {}
+
+if 'contexts' not in st.session_state:
+    st.session_state.contexts = {}
+
+if 'translations' not in st.session_state:
+    st.session_state.translations = {}
+
+if 'string_files' not in st.session_state:
+    st.session_state.string_files = {}
+
+if 'selected_project' not in st.session_state:
+    st.session_state.selected_project = None
+
+if 'show_language_dialog' not in st.session_state:
+    st.session_state.show_language_dialog = False
+
+if 'selected_file_for_translation' not in st.session_state:
+    st.session_state.selected_file_for_translation = None
+
+if 'selected_file_strings' not in st.session_state:
+    st.session_state.selected_file_strings = {}
+
+if 'show_language_dialog_for_file' not in st.session_state:
+    st.session_state.show_language_dialog_for_file = False
+
+if 'review_file_path' not in st.session_state:
+    st.session_state.review_file_path = None
+
+# Add new session state variables for navigation
+if 'page' not in st.session_state:
+    st.session_state.page = "📚 Home"
+
+# Landing Page
+if st.session_state.page == "📚 Home":
+    # Hero section
+    st.markdown("""
+    <div class="hero-section">
+        <h1>Welcome to UI String Translator</h1>
+        <p>The most efficient way to localize your applications with high-quality, context-aware translations across multiple languages.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Main Features Section
+    st.markdown("## Main Features")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div class="feature-card">
+            <h3>🔍 Automatic Repository Scanning</h3>
+            <p>Connect your GitHub repository and we'll automatically find all your localizable string resources with intelligent pattern matching.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown("""
+        <div class="feature-card">
+            <h3>🧠 Context-Aware AI Translation</h3>
+            <p>Our Gemini-powered translation engine understands UI context to deliver natural, accurate translations that fit perfectly in your interface.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown("""
+        <div class="feature-card">
+            <h3>🌐 20+ Languages Supported</h3>
+            <p>Localize your application into all major world languages with just a few clicks, reaching a global audience instantly.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("## How It Works")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown("""
+        <div class="feature-card" style="text-align: center;">
+            <h3>1. Connect</h3>
+            <p>Link your GitHub repository or upload your string resources directly.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown("""
+        <div class="feature-card" style="text-align: center;">
+            <h3>2. Select</h3>
+            <p>Choose the languages you want to translate your content into.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown("""
+        <div class="feature-card" style="text-align: center;">
+            <h3>3. Review</h3>
+            <p>Verify and refine the AI-generated translations as needed.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col4:
+        st.markdown("""
+        <div class="feature-card" style="text-align: center;">
+            <h3>4. Export</h3>
+            <p>Download your translations in the format that fits your project.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    def go_to_projects():
+        st.session_state.page = "📋 Projects"
+            # Force sidebar to open
+        st.session_state.sidebar_expanded = True    
+    st.button("🚀 Get Started Now", 
+                on_click=go_to_projects,
+                use_container_width=True,
+                type="primary",
+                key="get_started_btn")
+
+# Projects Dashboard
+elif st.session_state.page == "📋 Projects":
+    st.markdown("<h1>Projects Dashboard</h1>", unsafe_allow_html=True)
     
     # Create new project section
-    with st.expander("Create New Project", expanded=True):
+    with st.expander("➕ Create New Project", expanded=True):
         col1, col2 = st.columns(2)
         with col1:
             project_name = st.text_input("Project Name", key="create_project_name")
@@ -921,7 +1172,7 @@ with tabs[0]:
         
         if project_type == "GitHub Repository":
             # GitHub Repository section
-            st.caption("**Enter GitHub Repository URL (include /tree/branch-name for non-default branches)**")
+            st.markdown("**Enter GitHub Repository URL (include /tree/branch-name for non-default branches)**")
             repo_url = st.text_input("Repository URL", key="create_repo_url", 
                                     placeholder="https://github.com/openMF/mifos-mobile/tree/kmp-impl")
             
@@ -930,16 +1181,13 @@ with tabs[0]:
                                            help="Scans for strings.xml files in common locations first")
             
             # Display common patterns - updated for Mifos KMP project
-            st.caption("**Common string resource patterns for Mifos KMP:**")
+            st.markdown("**Common string resource patterns:**")
             st.code("""
-
 feature/*/src/commonMain/composeResources/values/strings.xml
-
 
 # Other Compose Multiplatform patterns
 */src/commonMain/composeResources/values/strings.xml
-
-                """)
+            """)
             
             col1, col2 = st.columns(2)
             with col1:
@@ -964,10 +1212,10 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                             
                             if string_files:
                                 st.session_state.projects[project_name]["files"] = string_files
-                                st.success(f"Project created! Found {len(string_files)} strings.xml files in {branch_display}.")
+                                st.markdown(f"<div class='status-success'>Project created! Found {len(string_files)} strings.xml files in {branch_display}.</div>", unsafe_allow_html=True)
                                 
                                 # Immediately show the found files
-                                st.subheader("Found Resource Files")
+                                st.markdown("### Found Resource Files")
                                 file_data = []
                                 for file_path, content in string_files.items():
                                     # Parse file content to get string count
@@ -1001,11 +1249,11 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                                             features_found.add(parts[feature_index + 1])
                                 
                                 if features_found:
-                                    st.success(f"Found strings in {len(features_found)} feature modules: {', '.join(features_found)}")
+                                    st.markdown(f"<div class='status-success'>Found strings in {len(features_found)} feature modules: {', '.join(features_found)}</div>", unsafe_allow_html=True)
                                 
                                 # File preview section
                                 if file_data:
-                                    st.subheader("File Preview")
+                                    st.markdown("### File Preview")
                                     selected_file = st.selectbox("Select file to preview", list(string_files.keys()), key="dashboard_file_preview_select")
                                     
                                     if selected_file:
@@ -1054,93 +1302,154 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                                             except:
                                                 st.code(file_content)
                             else:
-                                st.warning("No strings.xml files found in repository. Try these troubleshooting steps:")
                                 st.markdown("""
+                                <div class='status-warning'>No strings.xml files found in repository. Try these troubleshooting steps:</div>
+                                
                                 1. Make sure you're specifying the correct branch in the URL (e.g., /tree/kmp-impl)
                                 2. Try disabling pattern-based scanning for a full repository scan
                                 3. Verify the repository URL is correct
                                 4. Make sure your GitHub token has proper access permissions
                                 5. Check if the repository has a different structure for string resources
-                                """)
+                                """, unsafe_allow_html=True)
                     else:
-                        st.error("Please provide both project name and repository URL.")
+                        st.markdown("<div class='status-error'>Please provide both project name and repository URL.</div>", unsafe_allow_html=True)
         else:
-            if st.button("Create Upload Project", key="create_upload_project_button"):
-                if project_name:
-                    st.session_state.projects[project_name] = {
-                        "type": project_type,
-                        "files": {},
-                        "translations": {}
-                    }
-                    st.success(f"Project '{project_name}' created! Go to Upload & Translate tab to add files.")
-                else:
-                    st.error("Please provide a project name.")
-    
-    
+            # File upload option
+            uploaded_file = st.file_uploader("Choose a strings file", type=["json", "xml"])
+            
+            if uploaded_file is not None:
+                try:
+                    # Load and parse the file
+                    file_content = uploaded_file.read().decode()
+                    
+                    # Preview the file
+                    if uploaded_file.name.endswith(".json"):
+                        # Parse JSON file
+                        content = json.loads(file_content)
+                        flattened_content = flatten_json(content)
+                        
+                        # Display preview
+                        st.markdown("<div class='status-success'>File loaded successfully!</div>", unsafe_allow_html=True)
+                        st.markdown(f"Found {len(flattened_content)} strings.")
+                        
+                        preview_df = pd.DataFrame(
+                            {"Key": list(flattened_content.keys())[:5], 
+                            "Value": list(flattened_content.values())[:5]}
+                        )
+                        st.dataframe(preview_df, use_container_width=True)
+                        
+                    elif uploaded_file.name.endswith(".xml"):
+                        # Parse XML file
+                        strings_dict = xml_to_strings_dict(file_content)
+                        
+                        # Display preview
+                        st.markdown("<div class='status-success'>File loaded successfully!</div>", unsafe_allow_html=True)
+                        st.markdown(f"Found {len(strings_dict)} strings.")
+                        
+                        preview_df = pd.DataFrame(
+                            {"Key": list(strings_dict.keys())[:5],
+                            "Value": list(strings_dict.values())[:5]}
+                        )
+                        st.dataframe(preview_df, use_container_width=True)
+                        
+                    # Create project button
+                    if st.button("Create Upload Project", key="create_upload_project_button"):
+                        if project_name:
+                            st.session_state.projects[project_name] = {
+                                "type": "Manual Upload",
+                                "files": {uploaded_file.name: file_content},
+                                "translations": {}
+                            }
+                            
+                            # Store the file content in the appropriate format
+                            if uploaded_file.name.endswith(".json"):
+                                # Add to project translations
+                                st.session_state.projects[project_name]["translations"]["en"] = flattened_content
+                            elif uploaded_file.name.endswith(".xml"):
+                                # Add to project translations
+                                st.session_state.projects[project_name]["translations"]["en"] = strings_dict
+                                
+                            st.markdown(f"<div class='status-success'>Project '{project_name}' created successfully!</div>", unsafe_allow_html=True)
+                        else:
+                            st.markdown("<div class='status-error'>Please provide a project name.</div>", unsafe_allow_html=True)
+                except Exception as e:
+                    st.markdown(f"<div class='status-error'>Error processing file: {str(e)}</div>", unsafe_allow_html=True)
+            else:
+                if st.button("Create Upload Project", key="create_empty_project_button"):
+                    if project_name:
+                        st.session_state.projects[project_name] = {
+                            "type": "Manual Upload",
+                            "files": {},
+                            "translations": {}
+                        }
+                        st.markdown(f"<div class='status-success'>Project '{project_name}' created! Please upload files to translate.</div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<div class='status-error'>Please provide a project name.</div>", unsafe_allow_html=True)
+
     # List existing projects
-    st.subheader("Existing Projects")
+    st.markdown("## Your Projects")
     
     if not st.session_state.projects:
-        st.info("No projects created yet. Use the form above to create a new project.")
+        st.markdown("""
+        <div class="feature-card" style="text-align:center; padding: 40px;">
+            <h3>No projects yet</h3>
+            <p>Create your first project above to get started with translations.</p>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        for project_name, project_data in st.session_state.projects.items():
-            with st.container():
-                col1, col2, col3 = st.columns([3, 1, 1])
-                
-                with col1:
-                    st.write(f"**{project_name}**")
-                    st.caption(f"Type: {project_data['type']}")
-                    
-                    if project_data["type"] == "GitHub Repository":
-                        st.caption(f"Repository: {project_data['repo_url']}")
-                    
-                    # Show file count
-                    file_count = len(project_data.get("files", {}))
-                    st.caption(f"Files: {file_count}")
-                    
-                    # Show languages
-                    languages = list(project_data.get("translations", {}).keys())
-                    if languages:
-                        st.caption(f"Languages: {', '.join(languages)}")
-                    else:
-                        st.caption("No translations yet")
-                
-                with col2:
-                    if st.button("View Files", key=f"view_{project_name}"):
-                        # Instead of switching to GitHub tab, expand a section below with file info
-                        st.session_state.selected_project = project_name
-                        st.session_state.show_project_files = True
-                
-                with col3:
-                    if st.button("Generate Translations", key=f"translate_{project_name}"):
-                        st.session_state.selected_project = project_name
+        # Display projects in a grid
+        projects_list = list(st.session_state.projects.items())
+        for i in range(0, len(projects_list), 2):
+            cols = st.columns(2)
+            for j in range(2):
+                if i + j < len(projects_list):
+                    project_name, project_data = projects_list[i + j]
+                    with cols[j]:
+                        st.markdown(f"""
+                        <div class="feature-card">
+                            <h3>{project_name}</h3>
+                            <p>Type: {project_data["type"]}</p>
+                            <p>Files: {len(project_data.get("files", {}))}</p>
+                            <p>Languages: {', '.join(project_data.get("translations", {}).keys()) or "None yet"}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
-                        # Show language selection dialog
-                        st.session_state.show_language_dialog = True
-                        st.rerun()
-                
-                st.divider()
+                        # Action buttons
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("View Files", key=f"view_{project_name}"):
+                                st.session_state.selected_project = project_name
+                                st.session_state.show_project_files = True
+                                st.rerun()
+                        with col2:
+                            if st.button("Translate", key=f"translate_{project_name}"):
+                                st.session_state.selected_project = project_name
+                                st.session_state.show_language_dialog = True
+                                st.rerun()
     
-    # Display project files if requested (instead of switching to GitHub tab)
+    # Display project files if requested
     if st.session_state.get("show_project_files", False) and st.session_state.get("selected_project"):
         project = st.session_state.projects[st.session_state.selected_project]
         
-        st.subheader(f"Files in {st.session_state.selected_project}")
+        st.markdown(f"## Files in {st.session_state.selected_project}")
+        
+        # Add horizontal line for visual separation
+        st.markdown("<hr>", unsafe_allow_html=True)
         
         if project["files"]:
             # Add option to rescan the repository
             if project["type"] == "GitHub Repository":
-                if st.button("Rescan Repository", key="rescan_repository"):
+                if st.button("🔄 Rescan Repository", key="rescan_repository"):
                     with st.spinner("Rescanning repository..."):
                         repo_url = project["repo_url"]
                         string_files = scan_github_repository(repo_url, pattern_search=True)
                         
                         if string_files:
                             project["files"] = string_files
-                            st.success(f"Found {len(string_files)} strings.xml files!")
+                            st.markdown(f"<div class='status-success'>Found {len(string_files)} strings.xml files!</div>", unsafe_allow_html=True)
                             st.rerun()
                         else:
-                            st.warning("No strings.xml files found in repository.")
+                            st.markdown("<div class='status-warning'>No strings.xml files found in repository.</div>", unsafe_allow_html=True)
             
             # Create a table of files
             file_data = []
@@ -1168,9 +1477,9 @@ feature/*/src/commonMain/composeResources/values/strings.xml
             
             # File preview section
             if file_data:
-                st.subheader("File Preview")
+                st.markdown("### File Preview")
                 
-                # Group files by feature module
+                # Group files by feature module for better organization
                 grouped_files = {}
                 for file_path in project["files"].keys():
                     if "/feature/" in file_path:
@@ -1198,11 +1507,35 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                 else:
                     file_options = list(project["files"].keys())
                 
-                selected_file = st.selectbox(
-                    "Select file to preview", 
-                    file_options,
-                    key="files_section_preview_select"
-                )
+                # Create columns for file selection and translate button
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    selected_file = st.selectbox(
+                        "Select file to preview", 
+                        file_options,
+                        key="files_section_preview_select"
+                    )
+                
+                with col2:
+                    if selected_file and st.button("🌐 Translate This File", key=f"proj_files_translate_btn"):
+                        # Get strings from the file
+                        file_content = project["files"][selected_file]
+                        
+                        if selected_file.endswith(".xml"):
+                            strings_dict = xml_to_strings_dict(file_content)
+                        else:
+                            try:
+                                json_content = json.loads(file_content)
+                                strings_dict = flatten_json(json_content)
+                            except:
+                                strings_dict = {}
+                                
+                        # Store the selected file and strings in session state
+                        st.session_state.selected_file_for_translation = selected_file
+                        st.session_state.selected_file_strings = strings_dict
+                        st.session_state.show_language_dialog_for_file = True
+                        st.rerun()
                 
                 if selected_file:
                     file_content = project["files"][selected_file]
@@ -1219,18 +1552,9 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                         st.dataframe(preview_df, use_container_width=True)
                         
                         # Show raw XML with a toggle
-                        if st.checkbox("Show Raw XML", key=f"proj_show_raw_xml_{selected_file.replace('/', '_').replace('.', '_')}", value=False):
+                        with st.expander("View Raw XML", expanded=False):
                             st.code(file_content, language="xml")
                         
-                        # Add translation button for this specific file
-                        col1, col2 = st.columns([1, 2])
-                        with col1:
-                            if st.button("Translate This File", key=f"proj_files_translate_{selected_file.replace('/', '_').replace('.', '_')}"):
-                                # Store the selected file and strings in session state
-                                st.session_state.selected_file_for_translation = selected_file
-                                st.session_state.selected_file_strings = strings_dict
-                                st.session_state.show_language_dialog_for_file = True
-                                st.rerun()
                     else:
                         # Show JSON
                         try:
@@ -1245,7 +1569,7 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                             st.dataframe(preview_df, use_container_width=True)
                             
                             # Show raw JSON with a toggle
-                            if st.checkbox("Show Raw JSON", key=f"proj_show_raw_json_{selected_file.replace('/', '_').replace('.', '_')}", value=False):
+                            with st.expander("View Raw JSON", expanded=False):
                                 st.json(json_content)
                         except:
                             st.code(file_content)
@@ -1255,7 +1579,7 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                 st.session_state.show_project_files = False
                 st.rerun()
         else:
-            st.info("No string resource files found in this project.")
+            st.markdown("<div class='status-info'>No string resource files found in this project.</div>", unsafe_allow_html=True)
             
             # If GitHub project, add scan button
             if project["type"] == "GitHub Repository":
@@ -1266,10 +1590,10 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                         
                         if string_files:
                             project["files"] = string_files
-                            st.success(f"Found {len(string_files)} strings.xml files!")
+                            st.markdown(f"<div class='status-success'>Found {len(string_files)} strings.xml files!</div>", unsafe_allow_html=True)
                             st.rerun()
                         else:
-                            st.warning("No strings.xml files found in repository. Try disabling pattern-based scanning.")
+                            st.markdown("<div class='status-warning'>No strings.xml files found in repository. Try disabling pattern-based scanning.</div>", unsafe_allow_html=True)
                             
                             # Provide option for full scan
                             if st.button("Try Full Repository Scan (Slower)", key="full_scan_button"):
@@ -1279,18 +1603,111 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                                     
                                     if string_files:
                                         project["files"] = string_files
-                                        st.success(f"Found {len(string_files)} strings.xml files!")
+                                        st.markdown(f"<div class='status-success'>Found {len(string_files)} strings.xml files!</div>", unsafe_allow_html=True)
                                         st.rerun()
                                     else:
-                                        st.error("No strings.xml files found in repository. Please check the repository structure.")
+                                        st.markdown("<div class='status-error'>No strings.xml files found in repository. Please check the repository structure.</div>", unsafe_allow_html=True)
+    
+    # Language selection dialog for project
+    if st.session_state.get("show_language_dialog", False):
+        st.markdown(f"## Generate Translations for {st.session_state.selected_project}")
+        
+        # Add horizontal line for visual separation
+        st.markdown("<hr>", unsafe_allow_html=True)
+        
+        with st.form("project_language_selection_form"):
+            st.markdown("### Select Target Languages")
+            
+            selected_languages = st.multiselect(
+                "Choose languages for translation",
+                SUPPORTED_LANGUAGES,
+                default=["Spanish", "French", "German"],
+                key="project_languages_dialog_select"
+            )
+            
+            submitted = st.form_submit_button("Generate Translations")
+            
+            if submitted:
+                if selected_languages and configure_genai():
+                    # Start translation process for the project
+                    project = st.session_state.projects[st.session_state.selected_project]
+                    
+                    with st.spinner("Generating translations..."):
+                        # If project has translations, use them
+                        if "translations" in project and "en" in project["translations"]:
+                            source_strings = project["translations"]["en"]
+                            
+                            # Translate to each selected language
+                            for language in selected_languages:
+                                lang_code = LANGUAGE_CODES.get(language)
+                                if lang_code and lang_code != "en":
+                                    st.markdown(f"<div class='status-info'>Translating to {language}...</div>", unsafe_allow_html=True)
+                                    
+                                    translations = translate_all_strings(
+                                        source_strings, 
+                                        language
+                                    )
+                                    
+                                    # Store translations
+                                    project["translations"][lang_code] = translations
+                        # Otherwise, use the first file
+                        elif project["files"]:
+                            # Get the first file
+                            file_path = next(iter(project["files"]))
+                            file_content = project["files"][file_path]
+                            
+                            # Parse the file
+                            if file_path.endswith(".xml"):
+                                source_strings = xml_to_strings_dict(file_content)
+                            else:
+                                try:
+                                    json_content = json.loads(file_content)
+                                    source_strings = flatten_json(json_content)
+                                except:
+                                    source_strings = {}
+                            
+                            # Initialize translations dictionary if needed
+                            if "translations" not in project:
+                                project["translations"] = {}
+                            
+                            # Store original strings as English
+                            project["translations"]["en"] = source_strings
+                            
+                            # Translate to each selected language
+                            for language in selected_languages:
+                                lang_code = LANGUAGE_CODES.get(language)
+                                if lang_code and lang_code != "en":
+                                    st.markdown(f"<div class='status-info'>Translating to {language}...</div>", unsafe_allow_html=True)
+                                    
+                                    translations = translate_all_strings(
+                                        source_strings, 
+                                        language
+                                    )
+                                    
+                                    # Store translations
+                                    project["translations"][lang_code] = translations
+                    
+                    st.markdown(f"<div class='status-success'>Generated translations in {len(selected_languages)} languages!</div>", unsafe_allow_html=True)
+                    st.session_state.show_language_dialog = False
+                    
+                    # Automatically switch to review page
+                    st.session_state.page_selection = "🔄 Translation Review"
+                    st.rerun()
+                else:
+                    st.markdown("<div class='status-error'>Please select at least one language and configure Gemini API.</div>", unsafe_allow_html=True)
     
     # Language selection dialog for specific file
     if st.session_state.get("show_language_dialog_for_file", False):
+        st.markdown(f"## Generate Translations for {st.session_state.selected_file_for_translation}")
+        
+        # Add horizontal line for visual separation
+        st.markdown("<hr>", unsafe_allow_html=True)
+        
         with st.form("file_language_selection_form"):
-            st.subheader(f"Generate Translations for {st.session_state.selected_file_for_translation}")
+            st.markdown("### Select Target Languages")
             
             selected_languages = st.multiselect(
-                "Select target languages",
+                "Choose languages for translation",
                 SUPPORTED_LANGUAGES,
                 default=["Spanish", "French", "German"],
                 key="file_languages_dialog_select"
@@ -1299,7 +1716,7 @@ feature/*/src/commonMain/composeResources/values/strings.xml
             submitted = st.form_submit_button("Generate Translations")
             
             if submitted:
-                if selected_languages:
+                if selected_languages and configure_genai():
                     # Start translation process for the specific file
                     project = st.session_state.projects[st.session_state.selected_project]
                     
@@ -1322,7 +1739,7 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                         for language in selected_languages:
                             lang_code = LANGUAGE_CODES.get(language)
                             if lang_code and lang_code != "en":
-                                st.text(f"Translating to {language}...")
+                                st.markdown(f"<div class='status-info'>Translating to {language}...</div>", unsafe_allow_html=True)
                                 
                                 translations = translate_all_strings(
                                     strings_dict, 
@@ -1332,320 +1749,19 @@ feature/*/src/commonMain/composeResources/values/strings.xml
                                 # Store translations
                                 project["file_translations"][file_path][lang_code] = translations
                     
-                    st.success(f"Generated translations for file in {len(selected_languages)} languages!")
+                    st.markdown(f"<div class='status-success'>Generated translations for file in {len(selected_languages)} languages!</div>", unsafe_allow_html=True)
                     st.session_state.show_language_dialog_for_file = False
                     
-                    # Navigate to review tab for this specific file
-                    st.session_state.active_tab = "Review & Edit"
+                    # Navigate to review page
+                    st.session_state.page = "🔄 Translation Review"
                     st.session_state.review_file_path = file_path
                     st.rerun()
                 else:
-                    st.error("Please select at least one language.")
-with tabs[1]:
-    st.header("Step 1: Upload JSON or XML File")
-    
-    # Project selection
-    upload_project = st.selectbox(
-        "Select project for upload",
-        [p for p, data in st.session_state.projects.items() if data["type"] == "Manual Upload"],
-        key="upload_project_selector"
-    )
-    
-    uploaded_file = st.file_uploader("Choose a file", type=["json", "xml"])
-    
-    if uploaded_file is not None and upload_project:
-        try:
-            # Load and parse the file
-            file_content = uploaded_file.read().decode()
-            
-            if uploaded_file.name.endswith(".json"):
-                # Parse JSON file
-                content = json.loads(file_content)
-                flattened_content = flatten_json(content)
-                
-                # Store in session state and project
-                st.session_state.original_content = content
-                st.session_state.flattened_content = flattened_content
-                
-                # Add to project files
-                st.session_state.projects[upload_project]["files"][uploaded_file.name] = file_content
-                
-                # Display preview
-                st.success(f"File loaded successfully! Found {len(flattened_content)} strings.")
-                
-                # Count string values (non-nested objects)
-                string_count = sum(1 for v in flattened_content.values() if isinstance(v, str))
-                st.info(f"Found {string_count} translatable text strings and {len(flattened_content) - string_count} nested objects.")
-                
-                preview_df = pd.DataFrame(
-                    {"Key": list(flattened_content.keys())[:5], 
-                     "Value": list(flattened_content.values())[:5]}
-                )
-                st.dataframe(preview_df, use_container_width=True)
-                
-            elif uploaded_file.name.endswith(".xml"):
-                # Parse XML file
-                strings_dict = xml_to_strings_dict(file_content)
-                
-                # Store in session state and project
-                st.session_state.original_content = strings_dict
-                st.session_state.flattened_content = strings_dict
-                
-                # Add to project files
-                st.session_state.projects[upload_project]["files"][uploaded_file.name] = file_content
-                
-                # Display preview
-                st.success(f"File loaded successfully! Found {len(strings_dict)} strings.")
-                
-                preview_df = pd.DataFrame(
-                    {"Key": list(strings_dict.keys())[:5],
-                     "Value": list(strings_dict.values())[:5]}
-                )
-                st.dataframe(preview_df, use_container_width=True)
-            
-            # Add file summary
-            with st.expander("View File Structure Summary"):
-                # For JSON files
-                if uploaded_file.name.endswith(".json"):
-                    # Get top-level keys and count of nested elements
-                    top_levels = {}
-                    for key in flattened_content.keys():
-                        top_level = key.split('.')[0]
-                        if top_level in top_levels:
-                            top_levels[top_level] += 1
-                        else:
-                            top_levels[top_level] = 1
-                    
-                    # Display as a summary
-                    st.write("File structure:")
-                    for section, count in top_levels.items():
-                        st.write(f"- {section}: {count} elements")
-                # For XML files
-                else:
-                    st.write(f"XML structure: {len(strings_dict)} string elements")
-            
-            # Context addition section
-            st.header("Step 2: Add Context (Optional)")
-            st.info("You can add context for specific keys to improve translation quality.")
-            
-            if 'contexts' not in st.session_state:
-                st.session_state.contexts = {}
-            
-            # Interface for adding context
-            selected_key = st.selectbox("Select key to add context", list(st.session_state.flattened_content.keys()), key="context_key_selector")
-            current_context = st.session_state.contexts.get(selected_key, "")
-            
-            context = st.text_area(
-                "Enter context for this string (e.g., 'This appears on a login button')",
-                value=current_context,
-                key="context_text_area"
-            )
-            
-            if st.button("Save Context", key="save_context_button"):
-                st.session_state.contexts[selected_key] = context
-                st.success(f"Context saved for '{selected_key}'")
-            
-            # Display saved contexts
-            if st.session_state.contexts:
-                st.subheader("Saved Contexts")
-                contexts_df = pd.DataFrame(
-                    {"Key": list(st.session_state.contexts.keys()),
-                     "Context": list(st.session_state.contexts.values())}
-                )
-                st.dataframe(contexts_df, use_container_width=True)
-            
-            # Translation step
-            st.header("Step 3: Translate")
-            
-            # Show language selection multiselect
-            selected_languages = st.multiselect(
-                "Select target languages",
-                SUPPORTED_LANGUAGES,
-                default=["Spanish", "French", "German"],
-                key="upload_target_languages_select"
-            )
-            
-            if st.button("Start Translation") and selected_languages and configure_genai():
-                if 'translations' not in st.session_state:
-                    st.session_state.translations = {}
-                
-                project = st.session_state.projects[upload_project]
-                if "translations" not in project:
-                    project["translations"] = {}
-                
-                # Store original strings as English
-                project["translations"]["en"] = st.session_state.flattened_content
-                
-                # Translate to each selected language
-                for language in selected_languages:
-                    lang_code = LANGUAGE_CODES.get(language)
-                    if lang_code and lang_code != "en":
-                        with st.spinner(f"Translating to {language}..."):
-                            translations = translate_all_strings(
-                                st.session_state.flattened_content, 
-                                language, 
-                                st.session_state.contexts
-                            )
-                            
-                            # Store translations
-                            project["translations"][lang_code] = translations
-                            st.session_state.translations[lang_code] = translations
-                
-                st.success(f"Translated to {len(selected_languages)} languages!")
-                
-                # Navigate to review tab
-                st.session_state.active_tab = "Review & Edit"
-            
-        except Exception as e:
-            st.error(f"Error processing file: {str(e)}")
-    else:
-        if not upload_project and st.session_state.projects:
-            st.warning("Please select a project first or create a new one in the Dashboard tab.")
+                    st.markdown("<div class='status-error'>Please select at least one language and configure Gemini API.</div>", unsafe_allow_html=True)
 
-# GitHub Integration tab
-with tabs[2]:
-    st.header("GitHub Repository Integration")
-    
-    # Check if a project is selected from the dashboard
-    selected_project = st.session_state.get("selected_project")
-    
-    if selected_project and st.session_state.projects[selected_project]["type"] == "GitHub Repository":
-        project = st.session_state.projects[selected_project]
-        
-        st.subheader(f"Project: {selected_project}")
-        st.write(f"Repository: {project['repo_url']}")
-        
-        # Display found strings.xml files
-        st.subheader("Found Resource Files")
-        
-        if project["files"]:
-            # Create a table of files
-            file_data = []
-            for file_path, content in project["files"].items():
-                # Parse file content to get string count
-                if file_path.endswith(".xml"):
-                    strings_dict = xml_to_strings_dict(content)
-                    string_count = len(strings_dict)
-                else:
-                    # Assume JSON
-                    strings_dict = json.loads(content)
-                    string_count = len(flatten_json(strings_dict))
-                
-                file_data.append({
-                    "File Path": file_path,
-                    "String Count": string_count
-                })
-            
-            # Display as dataframe
-            file_df = pd.DataFrame(file_data)
-            st.dataframe(file_df, width=1000, use_container_width=True)
-            
-            # File preview section
-            st.subheader("File Preview")
-            
-            selected_file = st.selectbox("Select file to preview", list(project["files"].keys()), key="github_file_preview_select")
-            
-            if selected_file:
-                file_content = project["files"][selected_file]
-                
-                if selected_file.endswith(".xml"):
-                    # Parse XML and show as table
-                    strings_dict = xml_to_strings_dict(file_content)
-                    
-                    preview_df = pd.DataFrame({
-                        "Key": list(strings_dict.keys()),
-                        "Value": list(strings_dict.values())
-                    })
-                    
-                    st.dataframe(file_df, width=1000, use_container_width=True)
-
-                    # Also show raw XML in expander
-                    with st.expander("Raw XML"):
-                        st.code(file_content, language="xml")
-                    
-                    # Add translation button for this specific file
-                    if st.button("Translate This File", key=f"translate_file_{selected_file.replace('/', '_')}"):
-                        # Store the selected file and strings in session state
-                        st.session_state.selected_file_for_translation = selected_file
-                        st.session_state.selected_file_strings = strings_dict
-                        st.session_state.show_language_dialog_for_file = True
-                        st.rerun()
-                else:
-                    # Show JSON
-                    try:
-                        json_content = json.loads(file_content)
-                        flattened = flatten_json(json_content)
-                        
-                        preview_df = pd.DataFrame({
-                            "Key": list(flattened.keys()),
-                            "Value": list(flattened.values())
-                        })
-                        
-                        st.dataframe(preview_df, use_container_width=True)
-                        
-                        # Also show raw JSON in expander
-                        with st.expander("Raw JSON"):
-                            st.json(json_content)
-                        
-                        # Add translation button for this specific file
-                        if st.button("Translate This File", key=f"translate_file_{selected_file.replace('/', '_')}"):
-                            # Store the selected file and strings in session state
-                            st.session_state.selected_file_for_translation = selected_file
-                            st.session_state.selected_file_strings = flattened
-                            st.session_state.show_language_dialog_for_file = True
-                            st.rerun()
-                    except:
-                        st.code(file_content)
-            
-            # Replace the "Translate All Files" button with a note about individual file translation
-            st.info("Select a file above and click 'Translate This File' to generate translations for specific files.")
-        else:
-            st.info("No string resource files found in this repository.")
-            
-            # Manual scan button
-            if st.button("Scan Repository Again"):
-                with st.spinner("Scanning repository..."):
-                    string_files = scan_github_repository(project["repo_url"])
-                    
-                    if string_files:
-                        project["files"] = string_files
-                        st.success(f"Found {len(string_files)} strings.xml files!")
-                        st.experimental_rerun()
-                    else:
-                        st.warning("No strings.xml files found in repository.")
-    else:
-        # Show repository scan form if no project selected
-        st.subheader("Scan GitHub Repository")
-        
-        repo_url = st.text_input("GitHub Repository URL (e.g., https://github.com/username/repo)", key="github_scan_repo_url")
-        
-        if st.button("Scan Repository", key="github_scan_button"):
-            if repo_url and configure_github():
-                with st.spinner("Scanning repository..."):
-                    string_files = scan_github_repository(repo_url)
-                    
-                    if string_files:
-                        # Create a new project for this repository
-                        project_name = repo_url.split("/")[-1]
-                        st.session_state.projects[project_name] = {
-                            "type": "GitHub Repository",
-                            "repo_url": repo_url,
-                            "files": string_files,
-                            "translations": {}
-                        }
-                        
-                        st.session_state.selected_project = project_name
-                        st.success(f"Found {len(string_files)} strings.xml files! Project '{project_name}' created.")
-                        st.rerun()
-                    else:
-                        st.warning("No strings.xml files found in repository.")
-            else:
-                st.error("Please provide a valid GitHub repository URL and configure GitHub API.")
-
-# Review & Edit tab
-# Review & Edit tab
-with tabs[3]:
-    st.header("Review and Edit Translations")
+# Translation Review page
+elif st.session_state.page == "🔄 Translation Review":
+    st.markdown("<h1>Review and Edit Translations</h1>", unsafe_allow_html=True)
     
     # Select project
     projects_with_translations = [p for p, data in st.session_state.projects.items() 
@@ -1667,7 +1783,7 @@ with tabs[3]:
             
             if has_file_translations:
                 # File selection for projects with file-specific translations
-                st.subheader("Select File")
+                st.markdown("### Select File")
                 
                 # Default to the file that was just translated if set
                 default_file_index = 0
@@ -1698,7 +1814,7 @@ with tabs[3]:
                     translations = file_translations[selected_language]
                     
                     # Add search functionality
-                    search_query = st.text_input("Search keys or translations", "", key=f"search_file_query_{selected_language}")
+                    search_query = st.text_input("🔍 Search keys or translations", "", key=f"search_file_query_{selected_language}")
                     
                     # Create a dataframe for display and editing
                     if selected_language == "en":
@@ -1732,11 +1848,14 @@ with tabs[3]:
                             ]
                     
                     # Display as editable dataframe
+                    st.markdown("### Edit Translations")
+                    st.markdown("<div class='status-info'>Make changes directly in the table below and click Save when done.</div>", unsafe_allow_html=True)
+                    
                     edited_df = st.data_editor(df, use_container_width=True, 
                                               key=f"file_translation_editor_{selected_file}_{selected_language}")
                     
                     # Save edited translations
-                    if st.button("Save Edited Translations", key=f"save_file_translations_{selected_file}"):
+                    if st.button("💾 Save Edited Translations", key=f"save_file_translations_{selected_file}"):
                         # Update file translations
                         if selected_language == "en":
                             for i, row in edited_df.iterrows():
@@ -1749,7 +1868,7 @@ with tabs[3]:
                                 translation = row["Translation"]
                                 file_translations[selected_language][key] = translation
                                 
-                        st.success("Translations updated!")
+                        st.markdown("<div class='status-success'>Translations updated successfully!</div>", unsafe_allow_html=True)
                 
             elif has_project_translations:
                 # Traditional project-wide translations
@@ -1767,7 +1886,7 @@ with tabs[3]:
                     translations = project["translations"][selected_language]
                     
                     # Add search functionality
-                    search_query = st.text_input("Search keys or translations", "", key=f"search_query_{selected_language}")
+                    search_query = st.text_input("🔍 Search keys or translations", "", key=f"search_query_{selected_language}")
                     
                     # Create a dataframe for display and editing
                     if selected_language == "en":
@@ -1801,11 +1920,14 @@ with tabs[3]:
                             ]
                     
                     # Display as editable dataframe
+                    st.markdown("### Edit Translations")
+                    st.markdown("<div class='status-info'>Make changes directly in the table below and click Save when done.</div>", unsafe_allow_html=True)
+                    
                     edited_df = st.data_editor(df, use_container_width=True, 
                                               key=f"translation_editor_{selected_review_project}_{selected_language}")
                     
                     # Save edited translations
-                    if st.button("Save Edited Translations", key="save_project_translations"):
+                    if st.button("💾 Save Edited Translations", key="save_project_translations"):
                         # Update project translations
                         if selected_language == "en":
                             for i, row in edited_df.iterrows():
@@ -1818,48 +1940,227 @@ with tabs[3]:
                                 translation = row["Translation"]
                                 project["translations"][selected_language][key] = translation
                                 
-                        st.success("Translations updated!")
+                        st.markdown("<div class='status-success'>Translations updated successfully!</div>", unsafe_allow_html=True)
             else:
-                st.info("No translations available for this project yet.")
+                st.markdown("<div class='status-info'>No translations available for this project yet.</div>", unsafe_allow_html=True)
+                
+                # Add a button to translate
+                if st.button("Generate Translations Now"):
+                    st.session_state.selected_project = selected_review_project
+                    st.session_state.show_language_dialog = True
+                    st.rerun()
         else:
-            st.info("Please select a project to review.")
+            st.markdown("<div class='status-info'>Please select a project to review.</div>", unsafe_allow_html=True)
     else:
-        st.info("No projects with translations available yet. Please translate a project first.")
+        st.markdown("""
+        <div class="feature-card" style="text-align:center; padding: 40px;">
+            <h3>No translations available</h3>
+            <p>No projects with translations available yet. Please translate a project first.</p>
+            # Add a function to go to projects
+            def go_to_projects():
+                st.session_state.page = "📋 Projects"
+                
+            st.button("Go to Projects", on_click=go_to_projects)
+        </div>
+        """, unsafe_allow_html=True)
 
-# Initialize session state for the first run
-if 'original_content' not in st.session_state:
-    st.session_state.original_content = {}
-
-if 'flattened_content' not in st.session_state:
-    st.session_state.flattened_content = {}
-
-if 'contexts' not in st.session_state:
-    st.session_state.contexts = {}
-
-if 'translations' not in st.session_state:
-    st.session_state.translations = {}
-
-if 'string_files' not in st.session_state:
-    st.session_state.string_files = {}
-
-if 'selected_project' not in st.session_state:
-    st.session_state.selected_project = None
-
-if 'show_language_dialog' not in st.session_state:
-    st.session_state.show_language_dialog = False
-
-if 'selected_file_for_translation' not in st.session_state:
-    st.session_state.selected_file_for_translation = None
-
-if 'selected_file_strings' not in st.session_state:
-    st.session_state.selected_file_strings = {}
-
-if 'show_language_dialog_for_file' not in st.session_state:
-    st.session_state.show_language_dialog_for_file = False
-
-if 'review_file_path' not in st.session_state:
-    st.session_state.review_file_path = None
-
-# Add new session state variables for the integrated GitHub functionality
-if 'show_project_files' not in st.session_state:
-    st.session_state.show_project_files = False
+# Export page
+elif st.session_state.page == "📤 Export":
+    st.markdown("<h1>Export Translations</h1>", unsafe_allow_html=True)
+    
+    # Select project to export
+    projects_with_translations = [p for p, data in st.session_state.projects.items() 
+                                if data.get("translations") or data.get("file_translations")]
+    
+    if projects_with_translations:
+        selected_export_project = st.selectbox(
+            "Select project to export", 
+            projects_with_translations,
+            key="export_project_selector"
+        )
+        
+        if selected_export_project:
+            project = st.session_state.projects[selected_export_project]
+            
+            # Check if we have file-specific translations or project-wide translations
+            has_file_translations = "file_translations" in project and project["file_translations"]
+            has_project_translations = "translations" in project and project["translations"]
+            
+            # Create export options
+            st.markdown("## Export Format")
+            
+            export_format = st.radio(
+                "Select export format",
+                ["Android XML", "iOS Strings", "JSON", "Kotlin Multiplatform"],
+                key="export_format"
+            )
+            
+            # Show available languages
+            available_languages = []
+            
+            if has_file_translations:
+                # Get all languages from all files
+                for file_path, file_translations in project["file_translations"].items():
+                    available_languages.extend(file_translations.keys())
+            elif has_project_translations:
+                available_languages = list(project["translations"].keys())
+                
+            available_languages = list(set(available_languages))
+            
+            # Convert language codes to names for display
+            language_names = []
+            for code in available_languages:
+                language_name = next((name for name, lang_code in LANGUAGE_CODES.items() if lang_code == code), code)
+                language_names.append(language_name)
+                
+            st.markdown("## Available Languages")
+            st.markdown(", ".join(language_names))
+            
+            # Export options
+            st.markdown("## Export Options")
+            
+            if has_file_translations:
+                # Allow selecting specific files
+                file_paths = list(project["file_translations"].keys())
+                
+                selected_files = st.multiselect(
+                    "Select files to export (leave empty to export all)",
+                    file_paths,
+                    key="export_file_selector"
+                )
+                
+                if not selected_files:
+                    selected_files = file_paths
+            
+            # Export button
+            if st.button("Generate Export", key="generate_export_button"):
+                # Create a ZIP file with translations
+                with st.spinner("Generating export files..."):
+                    export_files = {}
+                    
+                    if has_file_translations:
+                        # Export file-specific translations
+                        for file_path in selected_files:
+                            file_translations = project["file_translations"][file_path]
+                            
+                            # Get filename without path
+                            filename = file_path.split("/")[-1]
+                            file_base = filename.split(".")[0]
+                            
+                            # Export each language
+                            for lang_code, translations in file_translations.items():
+                                if export_format == "Android XML":
+                                    # Create Android XML format
+                                    if lang_code == "en":
+                                        export_path = f"values/{file_base}.xml"
+                                    else:
+                                        export_path = f"values-{lang_code}/{file_base}.xml"
+                                        
+                                    export_files[export_path] = dict_to_strings_xml(translations)
+                                
+                                elif export_format == "iOS Strings":
+                                    # Create iOS Strings format
+                                    ios_content = ""
+                                    for key, value in translations.items():
+                                        ios_content += f'"{key}" = "{value}";\n'
+                                        
+                                    if lang_code == "en":
+                                        export_path = f"en.lproj/{file_base}.strings"
+                                    else:
+                                        export_path = f"{lang_code}.lproj/{file_base}.strings"
+                                        
+                                    export_files[export_path] = ios_content
+                                
+                                elif export_format == "JSON":
+                                    # Create JSON format
+                                    if lang_code == "en":
+                                        export_path = f"{file_base}.json"
+                                    else:
+                                        export_path = f"{file_base}_{lang_code}.json"
+                                        
+                                    export_files[export_path] = json.dumps(translations, ensure_ascii=False, indent=2)
+                                
+                                elif export_format == "Kotlin Multiplatform":
+                                    # Create KMP format
+                                    if lang_code == "en":
+                                        export_path = f"commonMain/resources/MR/base/{file_base}.xml"
+                                    else:
+                                        export_path = f"commonMain/resources/MR/{lang_code}/{file_base}.xml"
+                                        
+                                    export_files[export_path] = dict_to_strings_xml(translations)
+                    
+                    elif has_project_translations:
+                        # Export project-wide translations
+                        for lang_code, translations in project["translations"].items():
+                            if export_format == "Android XML":
+                                # Create Android XML format
+                                if lang_code == "en":
+                                    export_path = "values/strings.xml"
+                                else:
+                                    export_path = f"values-{lang_code}/strings.xml"
+                                    
+                                export_files[export_path] = dict_to_strings_xml(translations)
+                            
+                            elif export_format == "iOS Strings":
+                                # Create iOS Strings format
+                                ios_content = ""
+                                for key, value in translations.items():
+                                    ios_content += f'"{key}" = "{value}";\n'
+                                    
+                                if lang_code == "en":
+                                    export_path = "en.lproj/Localizable.strings"
+                                else:
+                                    export_path = f"{lang_code}.lproj/Localizable.strings"
+                                    
+                                export_files[export_path] = ios_content
+                            
+                            elif export_format == "JSON":
+                                # Create JSON format
+                                if lang_code == "en":
+                                    export_path = "strings.json"
+                                else:
+                                    export_path = f"strings_{lang_code}.json"
+                                    
+                                export_files[export_path] = json.dumps(translations, ensure_ascii=False, indent=2)
+                            
+                            elif export_format == "Kotlin Multiplatform":
+                                # Create KMP format
+                                if lang_code == "en":
+                                    export_path = "commonMain/resources/MR/base/strings.xml"
+                                else:
+                                    export_path = f"commonMain/resources/MR/{lang_code}/strings.xml"
+                                    
+                                export_files[export_path] = dict_to_strings_xml(translations)
+                    
+                    # Create a ZIP file
+                    zip_buffer = StringIO()
+                    with zipfile.ZipFile(zip_buffer, "w") as zf:
+                        for file_path, content in export_files.items():
+                            zf.writestr(file_path, content)
+                    
+                    # Display download button
+                    st.download_button(
+                        label="📥 Download Translations ZIP",
+                        data=zip_buffer.getvalue(),
+                        file_name=f"{selected_export_project}_translations.zip",
+                        mime="application/zip"
+                    )
+                    
+                # Show files included in export
+                st.markdown("## Files Included in Export")
+                for file_path in export_files.keys():
+                    st.markdown(f"- {file_path}")
+        else:
+            st.markdown("<div class='status-info'>Please select a project to export.</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="feature-card" style="text-align:center; padding: 40px;">
+            <h3>No translations available</h3>
+            <p>No projects with translations available yet. Please translate a project first.</p>
+            # Add a function to go to projects
+            def go_to_projects():
+                st.session_state.page = "📋 Projects"
+                
+            st.button("Go to Projects", on_click=go_to_projects)
+        </div>
+        """, unsafe_allow_html=True)
